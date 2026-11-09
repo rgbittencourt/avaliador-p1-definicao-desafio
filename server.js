@@ -104,12 +104,12 @@ Para a pergunta final do item 3, indique se cada elemento está presente: "sim" 
 Em "elementos_obs", uma frase curta dizendo o que falta, ou "" se todos estiverem presentes.
 
 COERÊNCIA DESAFIO -> RESULTADOS (campo "coerencia_desafio_resultados")
-Classifique se o desafio (item 3) leva de fato aos resultados esperados (item 5), considerando também a justificativa (item 4):
-- "Coerente": os resultados respondem diretamente ao problema formulado, para o mesmo público.
-- "Parcial": há relação, mas parte dos resultados não decorre do problema, muda de público ou fica genérica.
-- "Frágil": desafio e resultados são genéricos demais ou desconectados.
-- "Não avaliável": falta o item 3 ou o item 5.
-Em "motivo", uma frase curta. Se já houver uma etiqueta registrada pelo professor nos dados do trabalho, repita-a e use o motivo dele.`;
+Compare a pergunta-desafio (item 3) com os resultados esperados (item 5) e responda a três verificações com true ou false. O aplicativo calcula a etiqueta a partir delas, sempre pela mesma regra; não escolha a etiqueta.
+- "mesmo_publico": os resultados falam do mesmo público (ou de quem é diretamente afetado por ele) indicado na pergunta?
+- "decorre_do_problema": as mudanças descritas no item 5 decorrem de resolver o problema ou a melhoria formulada no item 3, e não de outro objetivo?
+- "especifico": os resultados descrevem mudanças concretas e observáveis, e não apenas expressões genéricas ("educação melhor", "alunos melhores", "transformar o ecossistema")?
+Em "motivo", uma frase curta que justifique as três respostas.
+Se houver uma etiqueta já registrada pelo professor nos dados do trabalho, ela prevalece.`;
 
 function montarPrompt(campos={}){
   const rubrica = ORDEM.map(chave=>{
@@ -148,7 +148,7 @@ FEEDBACK AO ESTUDANTE (campo "feedback")
 - Termine exatamente com: Um abraço,\nProf. Rogério
 
 Responda APENAS em JSON válido:
-{"pontuacoes":{${ORDEM.map(k=>`"${k}":{"pontos":0,"justificativa":""}`).join(',')}},"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"etiqueta":"Coerente","motivo":""},"alertas":[""],"feedback":""}`;
+{"pontuacoes":{${ORDEM.map(k=>`"${k}":{"pontos":0,"justificativa":""}`).join(',')}},"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"mesmo_publico":true,"decorre_do_problema":true,"especifico":true,"motivo":""},"alertas":[""],"feedback":""}`;
 }
 
 const semTravessao = (s) => String(s||'').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',');
@@ -170,7 +170,8 @@ function limparAvaliacao(resultado={}){
   return {pontuacoes,nota:Core.notaFinal(niveis),
     elementosPergunta:Object.values(elementos).some(Boolean)?elementos:null,
     elementosObs:semTravessao(String(resultado.elementos_obs||'').trim()),
-    coerenciaEtiqueta:Core.etiquetaValida(coer.etiqueta),
+    coerenciaEtiqueta:Core.etiquetaValida(coer.etiqueta)||(['mesmo_publico','decorre_do_problema','especifico'].some(k=>k in coer)?Core.etiquetaPorVerificacoes(coer,Boolean(Core.limpo(resultado._desafio)),Boolean(Core.limpo(resultado._resultados))):''),
+    coerenciaVerificacoes:['mesmo_publico','decorre_do_problema','especifico'].some(k=>k in coer)?{mesmo_publico:coer.mesmo_publico===true,decorre_do_problema:coer.decorre_do_problema===true,especifico:coer.especifico===true}:null,
     coerenciaMotivo:semTravessao(String(coer.motivo||'').trim()),
     alertas:Array.isArray(resultado.alertas)?resultado.alertas.map(String).map(semTravessao).filter(Boolean):[],feedback};
 }
@@ -188,19 +189,19 @@ TRABALHO
 ${blocoDados(c)}
 
 Responda APENAS em JSON válido:
-{"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"etiqueta":"Coerente","motivo":""}}`;
+{"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"mesmo_publico":true,"decorre_do_problema":true,"especifico":true,"motivo":""}}`;
 }
 app.post('/api/leitura-desafio',async(req,res)=>{
   if(precisaChave(res)) return;
   try{
-    const r=limparAvaliacao({...(await chamarIAReq(req,montarPromptLeituraDesafio(req.body||{}),0.1)),pontuacoes:{}});
-    res.json({elementosPergunta:r.elementosPergunta,elementosObs:r.elementosObs,coerenciaEtiqueta:r.coerenciaEtiqueta,coerenciaMotivo:r.coerenciaMotivo,modo:req.ia.provedor});
+    const c=req.body||{};const r=limparAvaliacao({...(await chamarIAReq(req,montarPromptLeituraDesafio(c),0)),pontuacoes:{},_desafio:c.desafio,_resultados:c.resultadosEsperados});
+    res.json({elementosPergunta:r.elementosPergunta,elementosObs:r.elementosObs,coerenciaEtiqueta:r.coerenciaEtiqueta,coerenciaMotivo:r.coerenciaMotivo,coerenciaVerificacoes:r.coerenciaVerificacoes,modo:req.ia.provedor});
   }catch(e){res.status(502).json({erro:e.message});}
 });
 
 app.post('/api/avaliar',async(req,res)=>{
   if(!req.ia.configurada) return res.json(avaliarLocalmente(req.body||{}));
-  try{res.json({...limparAvaliacao(await chamarIAReq(req,montarPrompt(req.body||{}))),modo:req.ia.provedor});}
+  try{const c=req.body||{};const r=await chamarIAReq(req,montarPrompt(c),0);res.json({...limparAvaliacao({...r,_desafio:c.desafio,_resultados:c.resultadosEsperados}),modo:req.ia.provedor});}
   catch(e){
     const fallback=avaliarLocalmente(req.body||{});
     fallback.modo='local-fallback';

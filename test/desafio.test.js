@@ -137,3 +137,17 @@ test('coerência desafio -> resultados entra no feedback e na análise de coerê
   const a = atividadeCoerencia({ coerenciaEtiqueta: 'Parcial', coerenciaMotivo: 'Motivo.' });
   assert.ok(a.campos.some(([r, v]) => /registrada/.test(r) && /Parcial/.test(v)));
 });
+
+test('etiqueta de coerência calculada pelas três verificações, sempre pela mesma regra', () => {
+  const e = (a, b, c) => C.etiquetaPorVerificacoes({ mesmo_publico: a, decorre_do_problema: b, especifico: c }, true, true);
+  assert.equal(e(true, true, true), 'Coerente');
+  assert.equal(e(true, true, false), 'Parcial');
+  assert.equal(e(false, true, true), 'Parcial');
+  assert.equal(e(true, false, true), 'Parcial');
+  assert.equal(e(true, false, false), 'Frágil');
+  assert.equal(e(false, false, true), 'Frágil');
+  assert.equal(C.etiquetaPorVerificacoes({ mesmo_publico: true, decorre_do_problema: true, especifico: true }, true, false), 'Não avaliável');
+  const r = limparAvaliacao({ pontuacoes: {}, coerencia_desafio_resultados: { mesmo_publico: true, decorre_do_problema: true, especifico: false, motivo: 'm' }, _desafio: 'Como podemos X?', _resultados: 'Algo.' });
+  assert.equal(r.coerenciaEtiqueta, 'Parcial');
+  assert.deepEqual(r.coerenciaVerificacoes, { mesmo_publico: true, decorre_do_problema: true, especifico: false });
+});

@@ -106,7 +106,8 @@ async function lerDesafioComIA({forcar=false}={}){
     const r=await api('/api/leitura-desafio',{method:'POST',body:JSON.stringify(formData())});
     if(r.elementosPergunta&&(forcar||elementos.origem!=='manual'))definirElementos(r.elementosPergunta,'ia',r.elementosObs||'');
     if(r.coerenciaEtiqueta&&(forcar||!value('coerenciaEtiqueta'))){$('coerenciaEtiqueta').value=r.coerenciaEtiqueta;$('coerenciaMotivo').value=r.coerenciaMotivo||'';ajustarMotivo();}
-    st.textContent=r.coerenciaEtiqueta?'Sugerido pela IA. Altere se discordar.':'';
+    const v=r.coerenciaVerificacoes;const mk=x=>x?'✔':'✘';
+    st.textContent=r.coerenciaEtiqueta?(v?`Sugerido pela IA: ${mk(v.mesmo_publico)} mesmo público · ${mk(v.decorre_do_problema)} resultados decorrem do problema · ${mk(v.especifico)} resultados específicos. Altere se discordar.`:'Sugerido pela IA. Altere se discordar.'):'';
   }catch(e){st.textContent=`Não foi possível sugerir com IA (${e.message}). Escolha manualmente ou use "Avaliar automaticamente".`;}
 }
 /* ---------- leitura do PDF ---------- */

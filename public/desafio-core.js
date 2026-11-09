@@ -342,6 +342,18 @@
     return '';
   }
 
+  // Etiqueta calculada sempre pela mesma regra, a partir de três verificações objetivas (sim/não):
+  // mesmo público, resultados decorrem do problema, resultados específicos.
+  function etiquetaPorVerificacoes(v, temItem3, temItem5) {
+    if (!temItem3 || !temItem5) return 'Não avaliável';
+    const b = (x) => x === true || /^(sim|true|s)$/i.test(String(x || '').trim());
+    const publico = b(v && v.mesmo_publico), decorre = b(v && v.decorre_do_problema), especifico = b(v && v.especifico);
+    if (!decorre && !publico) return 'Frágil';
+    if (!decorre && !especifico) return 'Frágil';
+    if (publico && decorre && especifico) return 'Coerente';
+    return 'Parcial';
+  }
+
   // ---------- indicadores por trabalho (usados no relatório da turma) ----------
   // Contexto predominante das propostas do item 2.
   function contextoPredominante(propostasDetalhe) {
@@ -400,6 +412,6 @@
 
   return { RUBRICA, ORDEM, pontosCriterio, maxCriterio, notaFinal, nivelValido, formatar, contarPalavras, semOrientacoes,
     semMarcadorLista, semMarcadores, limpo, comecaComoPodemos, elementosPergunta, elementosValidos, ELEMENTOS,
-    ETIQUETAS_COERENCIA, etiquetaValida, contextoPredominante,
+    ETIQUETAS_COERENCIA, etiquetaValida, etiquetaPorVerificacoes, contextoPredominante,
     listarPropostas, blocosPropostas, perguntasDesafio, orientadorVazio, alertas, TEC, TEM_FUNDAMENTO, EXEMPLO_PERGUNTA, marcado };
 });
