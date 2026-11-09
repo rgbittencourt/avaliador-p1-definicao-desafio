@@ -106,6 +106,7 @@ REGRAS DE EVIDÊNCIA
 - Uma boa pergunta-desafio foca no problema ou na melhoria e não impõe uma solução (ex.: "construir uma ponte" já é solução). Delimitação pode usar fatores espaciais, temporais, de classificação, qualidade ou quantidade, sem exigir todos.
 - A quantidade de propostas, por si só, não aumenta nem reduz a pontuação.
 - Usar ou não usar IA não altera a pontuação; vale a clareza da declaração.
+- Letras ou números de lista no início das linhas ("A.", "B)", "C -", "1.") são apenas marcadores de lista: ignore-os. Uma pergunta escrita como "A. Como podemos..." COMEÇA com "Como podemos".
 - Produza justificativas específicas, citando evidências ou ausências concretas.
 
 ALERTAS AUTOMÁTICOS DO APLICATIVO (verificações de forma; confirme no texto)
@@ -117,6 +118,22 @@ ${rubrica}
 TRABALHO EXTRAÍDO E REVISTO
 ${blocoDados(campos)}
 
+ELEMENTOS DA PERGUNTA-DESAFIO (campo "elementos_pergunta")
+Para a pergunta final do item 3, indique se cada elemento está presente: "sim" (explícito e específico), "parcial" (vago ou genérico) ou "nao" (ausente).
+- "que": o problema ou a melhoria desejada.
+- "quem": o público-alvo.
+- "onde": o local ou contexto (instituição, curso, setor, cidade...).
+- "tecnologia": a relação com tecnologias digitais (sem precisar fixar uma solução).
+Em "elementos_obs", uma frase curta dizendo o que falta, ou "" se todos estiverem presentes.
+
+COERÊNCIA DESAFIO -> RESULTADOS (campo "coerencia_desafio_resultados")
+Classifique se o desafio (item 3) leva de fato aos resultados esperados (item 5), considerando também a justificativa (item 4):
+- "Coerente": os resultados respondem diretamente ao problema formulado, para o mesmo público.
+- "Parcial": há relação, mas parte dos resultados não decorre do problema, muda de público ou fica genérica.
+- "Frágil": desafio e resultados são genéricos demais ou desconectados.
+- "Não avaliável": falta o item 3 ou o item 5.
+Em "motivo", uma frase curta.
+
 FEEDBACK AO ESTUDANTE (campo "feedback")
 - Comece exatamente com "Olá, ${String(campos.nome||'').trim().split(/\s+/)[0]||'estudante'},".
 - Uma frase de reconhecimento específica sobre o desafio escolhido, sem elogios vazios.
@@ -125,7 +142,7 @@ FEEDBACK AO ESTUDANTE (campo "feedback")
 - Termine exatamente com: Um abraço,\nProf. Rogério
 
 Responda APENAS em JSON válido:
-{"pontuacoes":{${ORDEM.map(k=>`"${k}":{"pontos":0,"justificativa":""}`).join(',')}},"alertas":[""],"feedback":""}`;
+{"pontuacoes":{${ORDEM.map(k=>`"${k}":{"pontos":0,"justificativa":""}`).join(',')}},"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"etiqueta":"Coerente","motivo":""},"alertas":[""],"feedback":""}`;
 }
 
 const semTravessao = (s) => String(s||'').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',');
@@ -142,7 +159,14 @@ function limparAvaliacao(resultado={}){
   }
   let feedback=semTravessao(String(resultado.feedback||'').trim()).replace(/\s*Um abraço,\s*Prof\. Rogério\s*$/i,'').trim();
   feedback += '\n\nUm abraço,\nProf. Rogério';
-  return {pontuacoes,nota:Core.notaFinal(niveis),alertas:Array.isArray(resultado.alertas)?resultado.alertas.map(String).map(semTravessao).filter(Boolean):[],feedback};
+  const elementos=Core.elementosValidos(resultado.elementos_pergunta||{});
+  const coer=resultado.coerencia_desafio_resultados||{};
+  return {pontuacoes,nota:Core.notaFinal(niveis),
+    elementosPergunta:Object.values(elementos).some(Boolean)?elementos:null,
+    elementosObs:semTravessao(String(resultado.elementos_obs||'').trim()),
+    coerenciaEtiqueta:Core.etiquetaValida(coer.etiqueta),
+    coerenciaMotivo:semTravessao(String(coer.motivo||'').trim()),
+    alertas:Array.isArray(resultado.alertas)?resultado.alertas.map(String).map(semTravessao).filter(Boolean):[],feedback};
 }
 
 app.post('/api/avaliar',async(req,res)=>{
@@ -165,10 +189,10 @@ function avaliarLocalmente(c={}){
   const props = Core.listarPropostas(c.propostasLista);
   const blocos = Core.blocosPropostas(c.propostasDetalhe);
   const completo = (b) => b.porQue && b.publico && b.local && (b.contexto === 'formal' || b.contexto === 'não formal') && b.pois && b.tecnologias;
-  const pergunta = so('desafio');
+  const pergunta = Core.limpo(c.desafio);
   const nPerguntas = Core.perguntasDesafio(c.desafio);
-  const comecaCerto = /^\s*["“]?como podemos/i.test(pergunta);
-  const just = so('justificativa'), result = so('resultadosEsperados');
+  const comecaCerto = Core.comecaComoPodemos(c.desafio);
+  const just = Core.limpo(c.justificativa), result = Core.limpo(c.resultadosEsperados);
   const n = {};
   const ident = [c.nome, c.matricula].every(x => String(x||'').trim() && !/^\s*(seu nome|matr[ií]cula)\s*$/i.test(x)) && !Core.orientadorVazio(c.orientador);
   n.identificacao = ident ? (/PDF/i.test(c.conformidadeModelo||'') ? topo('identificacao') : 1) : ((String(c.nome||'').trim() && !/^\s*seu nome\s*$/i.test(c.nome)) ? 1 : 0);
@@ -198,7 +222,7 @@ function avaliarLocalmente(c={}){
   };
   const pontuacoes = {};
   ORDEM.forEach(k => { pontuacoes[k] = { pontos: nivel(k, Math.min(n[k], topo(k))), justificativa: just_[k] }; });
-  const resultado = limparAvaliacao({pontuacoes, alertas:['Avaliação automática local: verifica presença e completude das partes, não o mérito. Revise cada critério lendo o trabalho.'], feedback:'A avaliação automática local verificou o preenchimento das partes da P1. Revise as justificativas da rubrica e ajuste a pontuação após a leitura do trabalho.'});
+  const resultado = limparAvaliacao({pontuacoes, elementos_pergunta: Core.elementosPergunta(c.desafio), coerencia_desafio_resultados: {etiqueta: (!pergunta || !result) ? 'Não avaliável' : '', motivo: (!pergunta || !result) ? 'Falta o item 3 ou o item 5.' : ''}, alertas:['Avaliação automática local: verifica presença e completude das partes, não o mérito. Revise cada critério lendo o trabalho.'], feedback:'A avaliação automática local verificou o preenchimento das partes da P1. Revise as justificativas da rubrica e ajuste a pontuação após a leitura do trabalho.'});
   return {...resultado, modo:'local'};
 }
 
@@ -219,6 +243,7 @@ REGRAS OBRIGATÓRIAS
 - Copie o texto do estudante sem resumir, melhorar ou inventar. Remova cabeçalhos, rodapés do IFSC, títulos dos itens e enunciados fixos.
 - "propostasLista": as ideias do item 1, uma por linha, mantendo as letras (A., B., ...). Se só houver "Eu gostaria…" do modelo, mantenha assim.
 - "propostasDetalhe": os blocos do item 2, cada um começando por "Eu gostaria ...", mantendo os rótulos do modelo em linhas próprias ("Por que seria bom fazer isso: ...", "Qual é o público-alvo dessa proposta: ...", "Em qual local essa ideia se aplica: ...", "Trata-se de um contexto de (X) educação formal / ( ) não-formal, pois: ...", "Como essa proposta se relaciona com as tecnologias digitais: ..."), preservando exatamente onde está o X da marcação. Separe os blocos com uma linha em branco.
+- Letras ou números de lista no início das respostas ("A.", "B)", "1.") podem ser mantidos; o aplicativo os descarta nas análises.
 - "desafio": SOMENTE a pergunta do estudante na caixa após "Agora é sua vez", nunca o exemplo do enunciado. Se houver várias perguntas do estudante, copie todas.
 - "justificativa" e "resultadosEsperados": os textos do estudante nos itens 4 e 5.
 - "iaDeclaracao": "Sim", "Não", "Ambos" (se os dois estiverem assinalados) ou "" (se nenhum). "iaDescricao": a descrição após "Se sim, descreva...".
@@ -258,6 +283,7 @@ function atividadeCoerencia(c = {}) {
       'Pergunte se a pergunta-desafio escolhida nasce de uma necessidade real do público indicado, ou se é um tema genérico que não muda a vida daquele grupo.',
       'Verifique se o público, o local e o contexto da proposta aprofundada no item 2 aparecem de fato na pergunta escolhida, e se a justificativa (item 4) mostra por que esse problema importa para esse público.',
       'Verifique se os resultados esperados (item 5) respondem ao problema formulado e são proporcionais ao escopo e ao público, sem depender de uma solução já escolhida.',
+      'Letras ou números de lista no início das linhas ("A.", "B)") são só marcadores: ignore-os.',
       'Não repita a análise de forma do documento: concentre-se na coerência entre problema, público, contexto e mudanças esperadas.'
     ],
     evidencia: 'Diferencie o que o estudante afirma do que demonstra com fatos, dados ou referências. Não invente características do público.',

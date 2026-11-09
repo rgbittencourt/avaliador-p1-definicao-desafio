@@ -246,7 +246,14 @@
       .filter((l) => l.trim() && !MARCADORES.some((re) => re.test(l)) && !/^\s*[A-Z][.)]\s*eu gostaria\s*(?:…|\.\.\.)?\s*$/i.test(l))
       .join('\n').trim();
   }
-  const PLACEHOLDER_NOME = /^\s*(seu nome|nome completo:?)\s*$/i;
+  // Marcadores de lista no início da linha ("A. ", "b) ", "C - ", "1. ", "- ", "• ") não fazem parte da resposta:
+  // são descartados antes das checagens e buscas.
+  const MARCADOR_LISTA = /^[ \t]*(?:(?:[A-Za-z]|\d{1,2})[ \t]*[.)\-–:][ \t]+|[-–•●▪*][ \t]+)/;
+  const semMarcadorLista = (linha) => String(linha == null ? '' : linha).replace(MARCADOR_LISTA, '');
+  function semMarcadores(texto) { return t(texto).split('\n').map(semMarcadorLista).join('\n').trim(); }
+  // Texto do estudante sem enunciados do modelo e sem marcadores de lista: base das análises.
+  const limpo = (texto) => semMarcadores(semOrientacoes(texto));
+  const PLACEHOLDER_NOME =/^\s*(seu nome|nome completo:?)\s*$/i;
   const PLACEHOLDER_MATRICULA = /^\s*(matr[ií]cula|n[uú]mero de matr[ií]cula:?)\s*$/i;
   const orientadorVazio = (v) => !t(v) || /^\s*selecione\s*$/i.test(v);
 
@@ -264,7 +271,7 @@
   const marcado = (s) => /\(\s*[xX✓✔•●]\s*\)/.test(s);
   // Blocos do item 2: cada um começa em "Eu gostaria".
   function blocosPropostas(texto) {
-    const s = t(texto);
+    const s = semMarcadores(texto);
     if (!s) return [];
     const partes = s.split(/\n(?=\s*eu gostaria)/i).map((p) => p.trim()).filter(Boolean);
     return partes.map((p) => {
@@ -289,6 +296,61 @@
   const TEM_FUNDAMENTO = /\d|segundo |de acordo com|conforme |dados|pesquisa|estudo|levantamento|IBGE|INEP|censo|relat[óo]rio|\(\s*[A-ZÁÉÍÓÚ][^()]*\d{4}\s*\)|refer[êe]ncia/i;
 
   function perguntasDesafio(texto) { return (semOrientacoes(texto).match(/como podemos/gi) || []).length; }
+  // A pergunta começa com "Como podemos", ignorando marcadores de lista ("A. Como podemos...") e aspas.
+  const comecaComoPodemos = (texto) => /^\s*["“'‘]?\s*como podemos/i.test(limpo(texto));
+
+  // ---------- os 4 elementos da pergunta-desafio (leitura automática, sinal para conferir) ----------
+  const PUBLICO_ESPECIFICO = /\b(alun[oa]s?|estudantes?|discentes?|professor(?:es|as?)?|docentes?|servidor(?:es|as?)?|trabalhador(?:es|as?)?|profissionais|profissional|t[ée]cnic[oa]s|equipes?|turmas?|egress[oa]s|colaborador(?:es|as?)|gestor(?:es|as?)|jovens|adultos|crian[çc]as|idosos|mulheres|cursistas|aprendizes|bolsistas|estagi[áa]ri[oa]s|funcion[áa]ri[oa]s|coordenador(?:es|as?)|tutor(?:es|as?)|ingressantes|formand[oa]s|volunt[áa]ri[oa]s|agricultor(?:es|as)|enfermeir[oa]s|educador(?:es|as)|instrutor(?:es|as)|empreendedor(?:es|as)|pais|fam[íi]lias|calouros|agentes|operador(?:es|as)|atendentes|vendedor(?:es|as)|recém-contratad[oa]s)\b/i;
+  const PUBLICO_GENERICO = /\b(pessoas|comunidade|p[úu]blico|usu[áa]ri[oa]s|participantes|sociedade|popula[çc][ãa]o|todos)\b/i;
+  const LOCAL = /\b(escolas?|institutos?|ifsc|if[a-z]{1,3}|campus|c[âa]mpus|universidades?|faculdades?|cursos?|empresas?|ongs?|secretarias?|prefeituras?|hospita(?:l|is)|unidades?|setor(?:es)?|departamentos?|laborat[óo]rios?|bibliotecas?|rede|munic[íi]pios?|cidades?|bairros?|estados?|cooperativas?|associa[çc][õo]es|associa[çc][ãa]o|centros?|polos?|senai|senac|sesi|sesc|sala de aula|oficinas?|cl[íi]nicas?|ind[úu]strias?|f[áa]bricas?|lojas?|creches?|ambiente de trabalho|programas?|projetos?|organiza[çc][ãa]o|organiza[çc][õo]es|institui[çc][ãa]o|institui[çc][õo]es|regi[ãa]o|resid[êe]ncias?|grupos?|aldeias?|comunidades? (?:quilombola|ind[íi]gena|rural))\b/i;
+  const TEC_ESPECIFICA = /aplicativ|\bapps?\b|plataforma|ambiente virtual|\bava\b|moodle|intelig[êe]ncia artificial|\bia\b|v[íi]deos?|podcasts?|software|simula[çc]|gamifica|jogos? digita|realidade (?:virtual|aumentada)|redes sociais|whatsapp|instagram|youtube|chatbot|rob[óo]tica|programa[çc][ãa]o|sistema|planilha|formul[áa]rio|e-?book|site|portal|tecnologias digitais|recursos digitais|ferramentas digitais|m[íi]dias digitais|meios digitais|ensino h[íi]brido|ead\b|educa[çc][ãa]o a dist[âa]ncia|online|on-line|internet|computador|celular|tablet|lms|3d|impressora/i;
+  const TEC_GENERICA = /tecnolog|digita|virtual|recurso/i;
+  // Nome próprio ou sigla depois da primeira palavra (indício de lugar ou instituição identificados).
+  const NOME_PROPRIO = /\s(?:[A-ZÁÉÍÓÚÂÊÔÃÕ][a-záéíóúâêôãõç]+(?:\s+(?:d[aeo]s?\s+)?[A-ZÁÉÍÓÚÂÊÔÃÕ][a-záéíóúâêôãõç]+)*|(?!(?:IA|TI|EAD|AVA)\b)[A-Z]{2,})\b/;
+  function elementosPergunta(texto) {
+    const q = limpo(texto).split(/\n+/)[0] || '';
+    if (!q) return { que: 'nao', quem: 'nao', onde: 'nao', tecnologia: 'nao' };
+    const depois = q.replace(/^\s*["“'‘]?\s*como podemos\s*/i, '');
+    const palavrasDepois = contarPalavras(depois);
+    const que = palavrasDepois >= 5 ? 'sim' : palavrasDepois >= 2 ? 'parcial' : 'nao';
+    const quem = PUBLICO_ESPECIFICO.test(q) ? 'sim' : PUBLICO_GENERICO.test(q) ? 'parcial' : 'nao';
+    const semInicio = q.replace(/^\s*["“'‘]?\s*como\s+/i, ' ');
+    const onde = LOCAL.test(q) ? (NOME_PROPRIO.test(semInicio) ? 'sim' : 'parcial') : (/\b(?:em|no|na|nos|nas)\s+[A-ZÁÉÍÓÚ]/.test(semInicio) ? 'parcial' : 'nao');
+    const tecnologia = TEC_ESPECIFICA.test(q) ? 'sim' : TEC_GENERICA.test(q) ? 'parcial' : 'nao';
+    return { que, quem, onde, tecnologia };
+  }
+  const ELEMENTOS = { que: 'o quê', quem: 'para quem', onde: 'onde', tecnologia: 'tecnologia' };
+  const VALOR_ELEMENTO = ['sim', 'parcial', 'nao'];
+  function elementosValidos(e) {
+    const out = {};
+    for (const k of Object.keys(ELEMENTOS)) {
+      const v = String(e && e[k] || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      out[k] = VALOR_ELEMENTO.includes(v) ? v : (/^s/.test(v) ? 'sim' : /^p/.test(v) ? 'parcial' : /^n/.test(v) ? 'nao' : '');
+    }
+    return out;
+  }
+
+  // ---------- coerência desafio (item 3) -> resultados esperados (item 5) ----------
+  const ETIQUETAS_COERENCIA = ['Coerente', 'Parcial', 'Frágil', 'Não avaliável'];
+  function etiquetaValida(v) {
+    const s = String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    if (!s) return '';
+    if (/^coer/.test(s)) return 'Coerente';
+    if (/^parc/.test(s)) return 'Parcial';
+    if (/^frag/.test(s)) return 'Frágil';
+    if (/^nao/.test(s)) return 'Não avaliável';
+    return '';
+  }
+
+  // ---------- indicadores por trabalho (usados no relatório da turma) ----------
+  // Contexto predominante das propostas do item 2.
+  function contextoPredominante(propostasDetalhe) {
+    const b = blocosPropostas(propostasDetalhe);
+    const f = b.filter((x) => x.contexto === 'formal').length, nf = b.filter((x) => x.contexto === 'não formal').length;
+    if (!f && !nf) return 'Não identificado';
+    if (f && nf) return f === nf ? 'Misto' : f > nf ? 'Formal' : 'Não formal';
+    return f ? 'Formal' : 'Não formal';
+  }
 
   function alertas(d) {
     const out = [];
@@ -316,18 +378,18 @@
       });
     }
 
-    const pergunta = semOrientacoes(d.desafio);
+    const pergunta = limpo(d.desafio);
     if (!pergunta) add('erro', 'Item 3: pergunta-desafio ausente (ou ainda "Como podemos … (preencha aqui)").');
     else {
-      if (!/^\s*["“]?como podemos/i.test(pergunta)) add('aviso', 'Item 3: a pergunta-desafio não começa com "Como podemos...".');
+      if (!comecaComoPodemos(d.desafio)) add('aviso', 'Item 3: a pergunta-desafio não começa com "Como podemos...".');
       if (perguntasDesafio(d.desafio) > 1) add('aviso', 'Item 3: há mais de uma pergunta "Como podemos"; a versão final deve ter uma só.');
       if (EXEMPLO_PERGUNTA.test(pergunta)) add('aviso', 'Item 3: a pergunta parece repetir o exemplo do modelo.');
       if (!TEC.test(pergunta)) add('aviso', 'Item 3: a pergunta não indica relação com tecnologias digitais.');
     }
-    const just = semOrientacoes(d.justificativa);
+    const just = limpo(d.justificativa);
     if (!just) add('erro', 'Item 4: justificativa da escolha ausente.');
     else if (!TEM_FUNDAMENTO.test(just)) add('aviso', 'Item 4: não há fatos, dados ou referências aparentes na justificativa.');
-    if (!semOrientacoes(d.resultadosEsperados)) add('erro', 'Item 5: resultados esperados ausentes.');
+    if (!limpo(d.resultadosEsperados)) add('erro', 'Item 5: resultados esperados ausentes.');
 
     const ia = t(d.iaDeclaracao);
     if (!ia) add('erro', 'Declaração de IA sem marcação (Sim ou Não).');
@@ -337,5 +399,7 @@
   }
 
   return { RUBRICA, ORDEM, pontosCriterio, maxCriterio, notaFinal, nivelValido, formatar, contarPalavras, semOrientacoes,
+    semMarcadorLista, semMarcadores, limpo, comecaComoPodemos, elementosPergunta, elementosValidos, ELEMENTOS,
+    ETIQUETAS_COERENCIA, etiquetaValida, contextoPredominante,
     listarPropostas, blocosPropostas, perguntasDesafio, orientadorVazio, alertas, TEC, TEM_FUNDAMENTO, EXEMPLO_PERGUNTA, marcado };
 });

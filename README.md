@@ -12,13 +12,16 @@ PWA para apoiar a avaliação da atividade **P1 - Descobrindo meu desafio** (UC 
 
 - importação da P1 em PDF no modelo oficial (lido no navegador com pdf.js, separado pelos itens 1 a 5 e pela declaração de IA, e interpretado com IA);
 - resumo ao vivo das propostas: quantas há no item 1, quantas foram aprofundadas no item 2 e, em cada bloco, se há por que, público-alvo, local, marcação formal/não formal, justificativa ("pois") e relação com tecnologias;
-- checagens da pergunta-desafio (começa com "Como podemos", uma única pergunta, indica tecnologias, não repete o exemplo do modelo) e da justificativa (fatos, dados ou referências aparentes);
+- checagens da pergunta-desafio (começa com "Como podemos", uma única pergunta, indica tecnologias, não repete o exemplo do modelo) e da justificativa (fatos, dados ou referências aparentes). Letras ou números de lista no início das respostas ("A.", "b)", "C -", "1.") são descartados nas checagens: "A. Como podemos..." começa com "Como podemos";
+- quadro dos **4 elementos da pergunta-desafio** (o quê, para quem, onde, tecnologia: ✅ presente, ⚠️ vago, ❌ ausente), por leitura automática e, ao avaliar, pela IA; o professor pode corrigir clicando;
+- etiqueta de **coerência desafio → resultados** (item 3 → item 5): Coerente, Parcial, Frágil ou Não avaliável, sugerida pela IA e editável, sem alterar a nota;
+- aviso de **PDF escaneado** (imagem sem texto selecionável), no arquivo inteiro ou em páginas específicas;
 - alertas automáticos de identificação, marcadores do modelo não substituídos ("Eu gostaria…", "Como podemos … (preencha aqui)") e marcações da declaração de IA (nenhuma ou as duas);
 - rubrica oficial em pontos (0,375, 0,625, 1,25...), nota = soma dos níveis;
 - avaliação automática com IA (OpenAI ou Anthropic) ou local conservadora;
 - feedback no padrão do Prof. Rogério: saudação, reconhecimento, comentários só dos critérios abaixo do máximo, sem travessão, "Um abraço, Prof. Rogério";
 - bloco complementar de **coerência da definição do desafio** (sem pontuação): problema, público, contexto e mudanças esperadas;
-- turmas no PostgreSQL (Neon), backup no repositório privado `avaliador-p1-definicao-desafio-dados`, exportação JSON/CSV, importação de turma e relatório executivo.
+- turmas no PostgreSQL (Neon), backup no repositório privado `avaliador-p1-definicao-desafio-dados`, exportação JSON/CSV, importação de turma e relatório executivo, que inclui o perfil da turma (elementos da pergunta, coerência, contexto formal/não formal das propostas, quantidade de propostas no item 1, declaração de IA e perguntas sem tecnologia), com botões **i** explicando como cada número é calculado. Esses indicadores vieram do antigo [Painel de Correção P1](https://github.com/rgbittencourt/PWA-Painel-Correcao-P1).
 
 ## Rubrica
 

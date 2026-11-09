@@ -88,3 +88,42 @@ Como essa proposta se relaciona com as tecnologias digitais: usar tecnologia`;
   assert.equal(r.pontuacoes.publico.pontos, 0.5);
   assert.equal(r.pontuacoes.tecnologias.pontos, 0.625);
 });
+
+test('letras de lista (A., b), C -) são descartadas nas checagens da pergunta', () => {
+  const txt = d => C.alertas(d).map(a => a.texto).join(' | ');
+  for (const q of ['A. Como podemos capacitar professores do IFSC para usar o Moodle?', 'b) Como podemos capacitar professores do IFSC com vídeos?', 'C - "Como podemos apoiar técnicos novos usando recursos digitais?"', '- Como podemos apoiar alunos com podcasts?']) {
+    assert.equal(C.comecaComoPodemos(q), true, q);
+    assert.doesNotMatch(txt({ desafio: q }), /não começa com/);
+  }
+  assert.match(txt({ desafio: 'A. Melhorar o ensino de química.' }), /não começa com "Como podemos/);
+  assert.match(txt({ desafio: 'A. Como podemos X com IA?\nB. Como podemos Y com IA?' }), /mais de uma pergunta/);
+  assert.equal(C.limpo('1. Segundo o IBGE...\n2. Outro ponto'), 'Segundo o IBGE...\nOutro ponto');
+  // "1." de uma lista não conta como dado na justificativa
+  assert.match(txt({ justificativa: '1. Porque gosto do tema.\n2. Porque é importante.' }), /não há fatos/);
+  // blocos do item 2 iniciados com letra
+  const b = C.blocosPropostas('A. Eu gostaria de melhorar X\nPor que seria bom fazer isso: ajuda\n\nB. Eu gostaria de Y para alunos\nQual é o público-alvo dessa proposta: alunos do 1º ano');
+  assert.equal(b.length, 2);
+  assert.match(b[1].publico, /alunos do 1º ano/);
+  // avaliação local não penaliza a letra
+  const r = avaliarLocalmente({ desafio: 'A. Como podemos ampliar a participação dos estudantes do curso técnico em Eletrotécnica do IFSC nas aulas práticas usando simulações digitais?' });
+  assert.match(r.pontuacoes.pergunta.justificativa, /^Começa com/);
+});
+
+test('elementos da pergunta-desafio e etiqueta de coerência', () => {
+  assert.deepEqual(C.elementosPergunta('A. Como podemos engajar os alunos do 6º ano da Escola Exemplo, em Florianópolis, nas aulas de Ciências, usando simulações digitais?'), { que: 'sim', quem: 'sim', onde: 'sim', tecnologia: 'sim' });
+  const vago = C.elementosPergunta('Como podemos melhorar a educação com tecnologia?');
+  assert.equal(vago.quem, 'nao'); assert.equal(vago.onde, 'nao'); assert.equal(vago.tecnologia, 'parcial');
+  assert.deepEqual(C.elementosPergunta(''), { que: 'nao', quem: 'nao', onde: 'nao', tecnologia: 'nao' });
+  assert.deepEqual(C.elementosValidos({ que: 'Sim', quem: 'não', onde: 'PARCIAL', tecnologia: 'x' }), { que: 'sim', quem: 'nao', onde: 'parcial', tecnologia: '' });
+  assert.equal(C.etiquetaValida('frágil'), 'Frágil'); assert.equal(C.etiquetaValida('nao avaliavel'), 'Não avaliável'); assert.equal(C.etiquetaValida('?'), '');
+  assert.equal(C.contextoPredominante(detalheBom), 'Não formal');
+  assert.equal(C.contextoPredominante(''), 'Não identificado');
+  const r = limparAvaliacao({ pontuacoes: {}, elementos_pergunta: { que: 'sim', quem: 'parcial', onde: 'nao', tecnologia: 'sim' }, elementos_obs: 'Falta o local — e o público.', coerencia_desafio_resultados: { etiqueta: 'parcial', motivo: 'Resultados genéricos.' }, feedback: 'x' });
+  assert.deepEqual(r.elementosPergunta, { que: 'sim', quem: 'parcial', onde: 'nao', tecnologia: 'sim' });
+  assert.doesNotMatch(r.elementosObs, /—/);
+  assert.equal(r.coerenciaEtiqueta, 'Parcial');
+  const p = montarPrompt({ desafio: 'A. Como podemos X?' });
+  assert.match(p, /"A\. Como podemos\.\.\." COMEÇA com "Como podemos"/);
+  assert.match(p, /"elementos_pergunta"/); assert.match(p, /"coerencia_desafio_resultados"/);
+  assert.equal(avaliarLocalmente({ desafio: 'Como podemos X para alunos?' }).coerenciaEtiqueta, 'Não avaliável');
+});
