@@ -88,7 +88,11 @@ ${textoCampo(c.resultadosEsperados)}
 
 DECLARAÇÃO DE TRANSPARÊNCIA NO USO DE IA
 Marcação: ${textoCampo(c.iaDeclaracao)}
-Descrição: ${textoCampo(c.iaDescricao)}`;
+Descrição: ${textoCampo(c.iaDescricao)}${c.coerenciaEtiqueta?`
+
+COERÊNCIA DESAFIO -> RESULTADOS JÁ REGISTRADA PELO PROFESSOR (respeite esta classificação)
+Etiqueta: ${c.coerenciaEtiqueta}
+Motivo: ${textoCampo(c.coerenciaMotivo)}`:''}`;
 }
 
 const INSTRUCOES_LEITURA_DESAFIO = `ELEMENTOS DA PERGUNTA-DESAFIO (campo "elementos_pergunta")
@@ -105,7 +109,7 @@ Classifique se o desafio (item 3) leva de fato aos resultados esperados (item 5)
 - "Parcial": há relação, mas parte dos resultados não decorre do problema, muda de público ou fica genérica.
 - "Frágil": desafio e resultados são genéricos demais ou desconectados.
 - "Não avaliável": falta o item 3 ou o item 5.
-Em "motivo", uma frase curta.`;
+Em "motivo", uma frase curta. Se já houver uma etiqueta registrada pelo professor nos dados do trabalho, repita-a e use o motivo dele.`;
 
 function montarPrompt(campos={}){
   const rubrica = ORDEM.map(chave=>{
@@ -138,6 +142,7 @@ ${INSTRUCOES_LEITURA_DESAFIO}
 FEEDBACK AO ESTUDANTE (campo "feedback")
 - Comece exatamente com "Olá, ${String(campos.nome||'').trim().split(/\s+/)[0]||'estudante'},".
 - Uma frase de reconhecimento específica sobre o desafio escolhido, sem elogios vazios.
+- Inclua um parágrafo curto sobre a coerência entre a pergunta-desafio (item 3) e os resultados esperados (item 5), conforme a etiqueta de "coerencia_desafio_resultados" (ou a já registrada pelo professor): se "Parcial" ou "Frágil", diga com clareza o que desconecta o problema das mudanças esperadas e como alinhar os dois; se "Coerente", reconheça isso em uma frase.
 - Comente SOMENTE os critérios que não atingiram o valor máximo, dizendo com clareza o que faltou e como melhorar (por exemplo, como delimitar melhor a pergunta). Não comente os critérios com valor máximo.
 - Escreva em parágrafos, em segunda pessoa, sem listas e sem travessão (—).
 - Termine exatamente com: Um abraço,\nProf. Rogério
@@ -306,6 +311,7 @@ function atividadeCoerencia(c = {}) {
     criterios: [
       'Pergunte se a pergunta-desafio escolhida nasce de uma necessidade real do público indicado, ou se é um tema genérico que não muda a vida daquele grupo.',
       'Verifique se o público, o local e o contexto da proposta aprofundada no item 2 aparecem de fato na pergunta escolhida, e se a justificativa (item 4) mostra por que esse problema importa para esse público.',
+      'Considere a etiqueta de coerência desafio -> resultados registrada, quando houver, e trate explicitamente essa relação no parecer e no feedback ao estudante: se Parcial ou Frágil, mostre o que desconecta o problema das mudanças esperadas e como alinhar.',
       'Verifique se os resultados esperados (item 5) respondem ao problema formulado e são proporcionais ao escopo e ao público, sem depender de uma solução já escolhida.',
       'Letras ou números de lista no início das linhas ("A.", "B)") são só marcadores: ignore-os.',
       'Não repita a análise de forma do documento: concentre-se na coerência entre problema, público, contexto e mudanças esperadas.'
@@ -313,7 +319,8 @@ function atividadeCoerencia(c = {}) {
     evidencia: 'Diferencie o que o estudante afirma do que demonstra com fatos, dados ou referências. Não invente características do público.',
     campos: [
       ['Nome', c.nome], ['Propostas do item 1', c.propostasLista], ['Aprofundamento das propostas (item 2)', c.propostasDetalhe],
-      ['Desafio', c.desafio], ['Justificativa (item 4)', c.justificativa], ['Resultados esperados (item 5)', c.resultadosEsperados]
+      ['Desafio', c.desafio], ['Justificativa (item 4)', c.justificativa], ['Resultados esperados (item 5)', c.resultadosEsperados],
+      ['Coerência desafio -> resultados registrada (etiqueta e motivo)', c.coerenciaEtiqueta ? `${c.coerenciaEtiqueta}. ${c.coerenciaMotivo || ''}` : '']
     ]
   };
 }

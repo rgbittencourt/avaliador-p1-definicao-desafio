@@ -127,3 +127,13 @@ test('elementos da pergunta-desafio e etiqueta de coerência', () => {
   assert.match(p, /"elementos_pergunta"/); assert.match(p, /"coerencia_desafio_resultados"/);
   assert.equal(avaliarLocalmente({ desafio: 'Como podemos X para alunos?' }).coerenciaEtiqueta, 'Não avaliável');
 });
+
+test('coerência desafio -> resultados entra no feedback e na análise de coerência', () => {
+  const { atividadeCoerencia } = require('../server');
+  const p = montarPrompt({ desafio: 'Como podemos X?', coerenciaEtiqueta: 'Frágil', coerenciaMotivo: 'Resultados falam de outro público.' });
+  assert.match(p, /JÁ REGISTRADA PELO PROFESSOR[\s\S]*Etiqueta: Frágil[\s\S]*outro público/);
+  assert.match(p, /Inclua um parágrafo curto sobre a coerência entre a pergunta-desafio/);
+  assert.doesNotMatch(montarPrompt({ desafio: 'Como podemos X?' }), /JÁ REGISTRADA PELO PROFESSOR/);
+  const a = atividadeCoerencia({ coerenciaEtiqueta: 'Parcial', coerenciaMotivo: 'Motivo.' });
+  assert.ok(a.campos.some(([r, v]) => /registrada/.test(r) && /Parcial/.test(v)));
+});
