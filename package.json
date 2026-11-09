@@ -1,0 +1,20 @@
+{
+  "name": "avaliador-p1-definicao-desafio-tedpro",
+  "version": "1.0.0",
+  "description": "PWA para avaliação da P1 - Descobrindo meu desafio (Portfólio I) do TEDPRO/IFSC.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.16.3"
+  }
+}
