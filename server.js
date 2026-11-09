@@ -91,6 +91,22 @@ Marcação: ${textoCampo(c.iaDeclaracao)}
 Descrição: ${textoCampo(c.iaDescricao)}`;
 }
 
+const INSTRUCOES_LEITURA_DESAFIO = `ELEMENTOS DA PERGUNTA-DESAFIO (campo "elementos_pergunta")
+Para a pergunta final do item 3, indique se cada elemento está presente: "sim" (explícito e específico), "parcial" (vago ou genérico) ou "nao" (ausente).
+- "que": o problema ou a melhoria desejada.
+- "quem": o público-alvo.
+- "onde": o local ou contexto (instituição, curso, setor, cidade...).
+- "tecnologia": a relação com tecnologias digitais (sem precisar fixar uma solução).
+Em "elementos_obs", uma frase curta dizendo o que falta, ou "" se todos estiverem presentes.
+
+COERÊNCIA DESAFIO -> RESULTADOS (campo "coerencia_desafio_resultados")
+Classifique se o desafio (item 3) leva de fato aos resultados esperados (item 5), considerando também a justificativa (item 4):
+- "Coerente": os resultados respondem diretamente ao problema formulado, para o mesmo público.
+- "Parcial": há relação, mas parte dos resultados não decorre do problema, muda de público ou fica genérica.
+- "Frágil": desafio e resultados são genéricos demais ou desconectados.
+- "Não avaliável": falta o item 3 ou o item 5.
+Em "motivo", uma frase curta.`;
+
 function montarPrompt(campos={}){
   const rubrica = ORDEM.map(chave=>{
     const c=RUBRICA[chave];
@@ -118,22 +134,7 @@ ${rubrica}
 TRABALHO EXTRAÍDO E REVISTO
 ${blocoDados(campos)}
 
-ELEMENTOS DA PERGUNTA-DESAFIO (campo "elementos_pergunta")
-Para a pergunta final do item 3, indique se cada elemento está presente: "sim" (explícito e específico), "parcial" (vago ou genérico) ou "nao" (ausente).
-- "que": o problema ou a melhoria desejada.
-- "quem": o público-alvo.
-- "onde": o local ou contexto (instituição, curso, setor, cidade...).
-- "tecnologia": a relação com tecnologias digitais (sem precisar fixar uma solução).
-Em "elementos_obs", uma frase curta dizendo o que falta, ou "" se todos estiverem presentes.
-
-COERÊNCIA DESAFIO -> RESULTADOS (campo "coerencia_desafio_resultados")
-Classifique se o desafio (item 3) leva de fato aos resultados esperados (item 5), considerando também a justificativa (item 4):
-- "Coerente": os resultados respondem diretamente ao problema formulado, para o mesmo público.
-- "Parcial": há relação, mas parte dos resultados não decorre do problema, muda de público ou fica genérica.
-- "Frágil": desafio e resultados são genéricos demais ou desconectados.
-- "Não avaliável": falta o item 3 ou o item 5.
-Em "motivo", uma frase curta.
-
+${INSTRUCOES_LEITURA_DESAFIO}
 FEEDBACK AO ESTUDANTE (campo "feedback")
 - Comece exatamente com "Olá, ${String(campos.nome||'').trim().split(/\s+/)[0]||'estudante'},".
 - Uma frase de reconhecimento específica sobre o desafio escolhido, sem elogios vazios.
@@ -168,6 +169,29 @@ function limparAvaliacao(resultado={}){
     coerenciaMotivo:semTravessao(String(coer.motivo||'').trim()),
     alertas:Array.isArray(resultado.alertas)?resultado.alertas.map(String).map(semTravessao).filter(Boolean):[],feedback};
 }
+
+// Leitura rápida do desafio: elementos da pergunta e coerência item 3 -> item 5 (feita logo após importar o PDF).
+function montarPromptLeituraDesafio(c={}){
+  return `Você auxilia o Prof. Rogério a ler a P1 - Descobrindo meu desafio (TEDPRO/IFSC). Faça uma leitura semântica, não por palavras-chave.
+- Letras ou números de lista no início das linhas ("A.", "B)", "1.") são apenas marcadores: ignore-os.
+- No item 3, não confunda o exemplo do modelo ("aprimorar o processo de ambientação de estudantes da Pós TEDPRO") com a pergunta do estudante.
+- Não use travessão (—).
+
+${INSTRUCOES_LEITURA_DESAFIO}
+
+TRABALHO
+${blocoDados(c)}
+
+Responda APENAS em JSON válido:
+{"elementos_pergunta":{"que":"sim","quem":"sim","onde":"sim","tecnologia":"sim"},"elementos_obs":"","coerencia_desafio_resultados":{"etiqueta":"Coerente","motivo":""}}`;
+}
+app.post('/api/leitura-desafio',async(req,res)=>{
+  if(precisaChave(res)) return;
+  try{
+    const r=limparAvaliacao({...(await chamarIAReq(req,montarPromptLeituraDesafio(req.body||{}),0.1)),pontuacoes:{}});
+    res.json({elementosPergunta:r.elementosPergunta,elementosObs:r.elementosObs,coerenciaEtiqueta:r.coerenciaEtiqueta,coerenciaMotivo:r.coerenciaMotivo,modo:req.ia.provedor});
+  }catch(e){res.status(502).json({erro:e.message});}
+});
 
 app.post('/api/avaliar',async(req,res)=>{
   if(!req.ia.configurada) return res.json(avaliarLocalmente(req.body||{}));
@@ -304,4 +328,4 @@ app.post('/api/analisar-coerencia', async (req, res) => {
 app.use((err,_req,res,_next)=>res.status(500).json({erro:err.message||'Erro interno.'}));
 
 if(require.main===module) app.listen(PORT,()=>console.log(`Avaliador P1 em http://localhost:${PORT}`));
-module.exports={app,atividadeCoerencia,montarPrompt,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,CAMPOS_P1};
+module.exports={app,montarPromptLeituraDesafio,atividadeCoerencia,montarPrompt,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,CAMPOS_P1};
